@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Email Verifier</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%230C1210'/%3E%3Ctext x='2' y='17' font-family='monospace' font-size='13' font-weight='700' fill='%235EEAD4'%3E%26gt;_%3C/text%3E%3C/svg%3E">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+    :root {
+      --bg: #0C1210;
+      --panel: #121815;
+      --fg: #E4E9E6;
+      --fg-muted: #7A8C82;
+      --border: #243029;
+      --accent: #5EEAD4;
+      --accent-dim: rgba(94, 234, 212, 0.08);
+
+      --valid: #4ADE80;   --valid-dim: rgba(74, 222, 128, 0.12);
+      --risky: #FBBF24;   --risky-dim: rgba(251, 191, 36, 0.12);
+      --unknown: #94A3B8; --unknown-dim: rgba(148, 163, 184, 0.12);
+      --invalid: #F87171; --invalid-dim: rgba(248, 113, 113, 0.12);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #F4F1EA;
+        --panel: #FFFFFF;
+        --fg: #1B1F1D;
+        --fg-muted: #6B7268;
+        --border: #D8D3C4;
+        --accent: #0E7490;
+        --accent-dim: rgba(14, 116, 144, 0.06);
+
+        --valid: #15803D;   --valid-dim: rgba(21, 128, 61, 0.08);
+        --risky: #B45309;   --risky-dim: rgba(180, 83, 9, 0.08);
+        --unknown: #52525B; --unknown-dim: rgba(82, 82, 91, 0.08);
+        --invalid: #B91C1C; --invalid-dim: rgba(185, 28, 28, 0.08);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 32px 16px;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: 'JetBrains Mono', ui-monospace, "Cascadia Code", "Roboto Mono", monospace;
+      font-size: 13.5px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .window {
+      max-width: 720px;
+      margin: 0 auto;
+      border: 1px solid var(--border);
+      background: var(--panel);
+    }
+
+    .titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .titlebar .title { font-weight: 700; letter-spacing: 0.04em; font-size: 13px; }
+
+    .status-indicator { display: none; align-items: center; gap: 6px; font-size: 11.5px; color: var(--fg-muted); white-space: nowrap; }
+    .status-indicator.show { display: inline-flex; }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--fg-muted); flex-shrink: 0; }
+    .status-dot.online { background: var(--valid); box-shadow: 0 0 0 3px var(--valid-dim); }
+    .status-dot.offline { background: var(--invalid); box-shadow: 0 0 0 3px var(--invalid-dim); }
+
+    .body-area { padding: 18px; }
+
+    .prompt-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      padding: 11px 14px;
+      cursor: pointer;
+      transition: border-color 150ms ease, background 150ms ease;
+    }
+    .prompt-row:hover, .prompt-row.hover { border-color: var(--accent); background: var(--accent-dim); }
+    .prompt-row .caret { color: var(--accent); font-weight: 700; }
+    .prompt-row .prompt-text { color: var(--fg-muted); font-size: 13px; }
+    .prompt-link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+    .cursor { display: inline-block; color: var(--accent); animation: blink 1s steps(1) infinite; margin-left: 2px; }
+    @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+
+    #jobs {
+      margin-top: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-height: 70vh;
+      overflow-y: auto;
+      padding-right: 4px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    #jobs::-webkit-scrollbar { width: 8px; }
+    #jobs::-webkit-scrollbar-track { background: transparent; }
+    #jobs::-webkit-scrollbar-thumb { background: var(--border); }
+    #jobs::-webkit-scrollbar-thumb:hover { background: var(--fg-muted); }
+
+    .job-block { border: 1px solid var(--border); padding: 14px 16px; }
+
+    .job-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .job-line { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .job-line .prefix { color: var(--accent); }
+    .job-filename { color: var(--fg); font-weight: 500; }
+
+    .icon-btn {
+      background: transparent;
+      border: none;
+      color: var(--fg-muted);
+      cursor: pointer;
+      font-size: 15px;
+      font-family: inherit;
+      line-height: 1;
+      padding: 2px 6px;
+      flex-shrink: 0;
+    }
+    .icon-btn:hover { color: var(--invalid); }
+    .icon-btn:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+
+    .progress-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .meter-bar { flex: 1; display: flex; gap: 2px; height: 14px; }
+    .meter-cell { flex: 1; background: var(--border); }
+    .meter-cell.filled { background: var(--accent); }
+    .progress-pct { color: var(--fg-muted); font-size: 12px; flex-shrink: 0; width: 38px; text-align: right; }
+
+    .status-line { font-size: 11.5px; color: var(--fg-muted); margin-bottom: 10px; }
+    .status-line.done { color: var(--accent); font-weight: 700; }
+
+    .tags-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .tag { font-size: 11px; padding: 2px 6px; border: 1px solid; font-weight: 500; }
+    .tag.valid   { color: var(--valid);   border-color: var(--valid);   background: var(--valid-dim); }
+    .tag.risky   { color: var(--risky);   border-color: var(--risky);   background: var(--risky-dim); }
+    .tag.unknown { color: var(--unknown); border-color: var(--unknown); background: var(--unknown-dim); }
+    .tag.invalid { color: var(--invalid); border-color: var(--invalid); background: var(--invalid-dim); }
+
+    .log-panel {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      height: 112px;
+      overflow-y: auto;
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .log-line { opacity: 0.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-line:last-child { opacity: 1; }
+    .log-line .t { color: var(--fg-muted); margin-right: 8px; }
+    .log-line .addr { color: var(--fg); }
+    .log-line .tag-inline { margin-left: 8px; font-weight: 700; }
+    .log-line .tag-inline.valid { color: var(--valid); }
+    .log-line .tag-inline.risky { color: var(--risky); }
+    .log-line .tag-inline.unknown { color: var(--unknown); }
+    .log-line .tag-inline.invalid { color: var(--invalid); }
+    .log-empty { color: var(--fg-muted); opacity: 0.6; }
+
+    .actions-row { margin-top: 12px; }
+    .actions-label { font-size: 10.5px; color: var(--fg-muted); letter-spacing: 0.05em; margin-bottom: 6px; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .btn-row + .actions-label { margin-top: 12px; }
+    .btn {
+      font-family: inherit;
+      font-size: 12px;
+      padding: 5px 10px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--fg);
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--bg);
+      font-weight: 700;
+      font-size: 12.5px;
+      padding: 8px 16px;
+    }
+    .btn-primary:hover { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+
+    footer {
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      font-size: 11.5px;
+      color: var(--fg-muted);
+    }
+    footer a { color: var(--fg-muted); text-decoration: underline; text-underline-offset: 2px; }
+    footer a:hover { color: var(--accent); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .cursor { animation: none; opacity: 1; }
+      * { transition-duration: 0.01ms !important; }
+    }
+
+    @media (max-width: 480px) {
+      body { padding: 16px 8px; font-size: 12.5px; }
+      .titlebar { padding: 10px 14px; }
+      .body-area { padding: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="window">
+    <div class="titlebar">
+      <span class="title">[ EMAIL VERIFIER ]</span>
+      <div class="status-indicator" id="smtp-indicator">
+        <span class="status-dot"></span>
+        <span class="status-label"></span>
+      </div>
+    </div>
+
+    <div class="body-area">
+      <div id="drop-zone" class="prompt-row">
+        <span class="caret">&gt;</span>
+        <span class="prompt-text">drop csv here, or <span class="prompt-link">browse</span></span>
+        <span class="cursor">&#9615;</span>
+      </div>
+      <input type="file" id="file-input" accept=".csv" style="display:none;">
+
+      <div id="jobs"></div>
+    </div>
+
+    <footer>
+      # this tool helps you find qualified leads.</footer>
+  </div>
+
+  <script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const jobsContainer = document.getElementById('jobs');
+    const smtpIndicator = document.getElementById('smtp-indicator');
+
+    const DOWNLOAD_FILTERS = [
+      { type: 'all', label: 'all' },
+      { type: 'valid', label: 'valid' },
+      { type: 'risky', label: 'risky' },
+      { type: 'unknown', label: 'unknown' },
+      { type: 'invalid', label: 'invalid' },
+      { type: 'non_role', label: 'non-role' },
+    ];
+
+    let smtpBannerShown = false;
+    function showSmtpBanner(available) {
+      if (smtpBannerShown) return;
+      smtpBannerShown = true;
+      smtpIndicator.classList.add('show');
+      const dot = smtpIndicator.querySelector('.status-dot');
+      const label = smtpIndicator.querySelector('.status-label');
+      if (available) {
+        dot.className = 'status-dot online';
+        label.textContent = 'live · smtp reachable';
+        smtpIndicator.title = 'SMTP (port 25) is reachable — mailboxes are confirmed live.';
+      } else {
+        dot.className = 'status-dot offline';
+        label.textContent = 'offline mode';
+        smtpIndicator.title = 'SMTP (port 25) is blocked on this network. Unconfirmed mailboxes are marked "unknown" instead of a guessed "valid".';
+      }
+    }
+
+    let jobList = JSON.parse(localStorage.getItem('verifier-jobs') || '[]');
+    jobList.forEach(({ job_id, fileName }) => {
+      const block = document.createElement('div');
+      block.className = 'job-block';
+      jobsContainer.prepend(block);
+      mountRunningJob(block, job_id, fileName);
+    });
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('hover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('hover'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('hover');
+      handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+
+    function handleFile(file) {
+      if (!file) return;
+      createPendingBlock(file);
+    }
+
+    function countRows(file, cb) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result || '');
+        const lines = text.split(/\r\n|\r|\n/).filter(l => l.trim().length > 0);
+        cb(Math.max(0, lines.length - 1));
+      };
+      reader.onerror = () => cb(null);
+      reader.readAsText(file);
+    }
+
+    function createPendingBlock(file) {
+      const block = document.createElement('div');
+      block.className = 'job-block';
+      block.innerHTML = `
+        <div class="job-head">
+          <div class="job-line"><span class="prefix">$</span> verify <span class="job-filename"></span></div>
+          <button class="icon-btn close-job" type="button" aria-label="Remove">×</button>
+        </div>
+        <div class="status-line pending-meta">reading file…</div>
+        <div class="actions-row">
+          <div class="btn-row">
+            <button class="btn btn-primary start-btn" type="button">[ ▸ start verification ]</button>
+          </div>
+        </div>
+      `;
+      block.querySelector('.job-filename').textContent = file.name;
+      jobsContainer.prepend(block);
+
+      const metaLine = block.querySelector('.pending-meta');
+      const closeBtn = block.querySelector('.close-job');
+      const startBtn = block.querySelector('.start-btn');
+
+      countRows(file, rows => {
+        metaLine.textContent = rows === null
+          ? 'ready to verify'
+          : `${rows} row${rows === 1 ? '' : 's'} detected — ready to verify`;
+      });
+
+      closeBtn.onclick = () => block.remove();
+
+      startBtn.onclick = () => {
+        startBtn.disabled = true;
+        startBtn.textContent = '[ starting… ]';
+        beginVerification(block, file);
+      };
+    }
+
+    function beginVerification(block, file) {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      fetch('http://localhost:5050/verify', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.json().then(body => ({ ok: res.ok, body })))
+      .then(({ ok, body }) => {
+        if (!ok) {
+          alert(body.error || 'Upload failed');
+          block.remove();
+          return;
+        }
+        showSmtpBanner(body.smtp_available);
+        jobList.push({ job_id: body.job_id, fileName: file.name });
+        localStorage.setItem('verifier-jobs', JSON.stringify(jobList));
+        mountRunningJob(block, body.job_id, file.name);
+      })
+      .catch(() => {
+        alert('Could not reach the verifier server. Is verify-app.py running?');
+        block.remove();
+      });
+    }
+
+    function parseLogText(text) {
+      const m = text.match(/^(.+) → (\w+) \((.+)\)$/);
+      if (!m) return null;
+      return { addr: m[1], status: m[2], reason: m[3] };
+    }
+
+    function meterHtml(percent, cells) {
+      cells = cells || 28;
+      const filled = Math.max(0, Math.min(cells, Math.round(cells * percent / 100)));
+      let html = '';
+      for (let i = 0; i < cells; i++) {
+        html += `<span class="meter-cell${i < filled ? ' filled' : ''}"></span>`;
+      }
+      return html;
+    }
+
+    function createJobBlock(job_id, fileName) {
+      const block = document.createElement('div');
+      block.className = 'job-block';
+      block.innerHTML = `
+        <div class="job-head">
+          <div class="job-line"><span class="prefix">$</span> verify <span class="job-filename"></span></div>
+          <button class="icon-btn close-job" type="button" aria-label="Remove job">×</button>
+        </div>
+        <div class="progress-row">
+          <div class="meter-bar">${meterHtml(0)}</div>
+          <span class="progress-pct">0%</span>
+        </div>
+        <div class="status-line">starting…</div>
+        <div class="tags-row"></div>
+        <div class="log-panel"><div class="log-empty">waiting for output…</div></div>
+        <div class="actions-row"><div class="btn-row"><button class="btn cancel-btn" type="button">[ cancel ]</button></div></div>
+      `;
+      block.querySelector('.job-filename').textContent = fileName;
+      jobsContainer.prepend(block);
+
+      const meterEl = block.querySelector('.meter-bar');
+      const pctEl = block.querySelector('.progress-pct');
+      const status = block.querySelector('.status-line');
+      const tagsRow = block.querySelector('.tags-row');
+      const logPanel = block.querySelector('.log-panel');
+      const actions = block.querySelector('.actions-row');
+      const closeBtn = block.querySelector('.close-job');
+
+      let canceled = false;
+      let finished = false;
+      let logHistory = [];
+      const MAX_LOG = 6;
+
+      const removeJob = () => {
+        block.remove();
+        jobList = jobList.filter(j => j.job_id !== job_id);
+        localStorage.setItem('verifier-jobs', JSON.stringify(jobList));
+      };
+
+      const cancelBtn = block.querySelector('.cancel-btn');
+      cancelBtn.onclick = () => {
+        canceled = true;
+        fetch(`http://localhost:5050/cancel?job_id=${job_id}`, { method: 'POST' });
+        status.textContent = 'canceled';
+        actions.innerHTML = '';
+      };
+
+      closeBtn.onclick = () => {
+        if (!finished) fetch(`http://localhost:5050/cancel?job_id=${job_id}`, { method: 'POST' });
+        removeJob();
+      };
+
+      function renderTags(c) {
+        const items = [
+          ['valid', 'VALID', c.valid || 0],
+          ['risky', 'RISKY', c.risky || 0],
+          ['unknown', 'UNKNOWN', c.unknown || 0],
+          ['invalid', 'INVALID', c.invalid || 0],
+        ];
+        tagsRow.innerHTML = items.map(([cls, label, count]) =>
+          `<span class="tag ${cls}">[${label}] ${count}</span>`
+        ).join('');
+      }
+
+      function renderLog() {
+        if (!logHistory.length) {
+          logPanel.innerHTML = `<div class="log-empty">waiting for output…</div>`;
+          return;
+        }
+        logPanel.innerHTML = logHistory.map(entry => {
+          const tagHtml = entry.parsed
+            ? `<span class="tag-inline ${entry.parsed.status}">[${entry.parsed.status.toUpperCase()}]</span>`
+            : '';
+          return `<div class="log-line"><span class="t">${entry.time}</span><span class="addr"></span>${tagHtml}</div>`;
+        }).join('');
+        const addrEls = logPanel.querySelectorAll('.addr');
+        logHistory.forEach((entry, i) => {
+          addrEls[i].textContent = entry.parsed ? entry.parsed.addr : entry.raw;
+        });
+        logPanel.scrollTop = logPanel.scrollHeight;
+      }
+
+      function pushLog(text) {
+        if (!text) return;
+        if (logHistory.length && logHistory[logHistory.length - 1].raw === text) return;
+        const parsed = parseLogText(text);
+        logHistory.push({ raw: text, time: new Date().toLocaleTimeString([], { hour12: false }), parsed });
+        if (logHistory.length > MAX_LOG) logHistory.shift();
+        renderLog();
+      }
+
+      const poll = setInterval(() => {
+        if (canceled || finished) return clearInterval(poll);
+
+        fetch(`http://localhost:5050/progress?job_id=${job_id}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.error) { clearInterval(poll); return; }
+            showSmtpBanner(data.smtp_available);
+            meterEl.innerHTML = meterHtml(data.percent);
+            pctEl.textContent = `${data.percent}%`;
+
+            if (data.phase === 'waiting') {
+              status.textContent = `waiting to re-check ${data.retry_count} greylisted address${data.retry_count === 1 ? '' : 'es'}…`;
+            } else if (data.phase === 'pass2') {
+              status.textContent = `re-checking ${data.retry_count} greylisted address${data.retry_count === 1 ? '' : 'es'}`;
+            } else if (data.done) {
+              status.textContent = `✓ done — ${data.total} address${data.total === 1 ? '' : 'es'} verified`;
+              status.classList.add('done');
+            } else {
+              status.textContent = `row ${data.row} of ${data.progress_total || data.total}`;
+            }
+            renderTags(data.counts);
+
+            if (data.done) {
+              finished = true;
+              clearInterval(poll);
+              const secondary = DOWNLOAD_FILTERS.filter(f => f.type !== 'all');
+              actions.innerHTML = `
+                <div class="btn-row">
+                  <a class="btn btn-primary" href="http://localhost:5050/download?job_id=${job_id}&type=all" target="_blank">[ ▸ download all results ]</a>
+                </div>
+                <div class="actions-label"># or filtered by result</div>
+                <div class="btn-row">
+                  ${secondary.map(f => `<a class="btn" href="http://localhost:5050/download?job_id=${job_id}&type=${f.type}" target="_blank">[ ${f.label} ]</a>`).join('')}
+                </div>
+              `;
+            }
+          });
+
+        fetch(`http://localhost:5050/log?job_id=${job_id}`)
+          .then(res => res.text())
+          .then(text => pushLog(text));
+      }, 1000);
+    }
+  </script>
+</body>
+</html>

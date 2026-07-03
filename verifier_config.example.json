@@ -1,0 +1,21 @@
+{
+  "_comment": "Copy this file to verifier_config.json to override defaults. All fields optional.",
+
+  "_helo_hostname_comment": "Domain the prober identifies itself as (HELO/EHLO + MAIL FROM). Defaults to this machine's hostname. The prober never sends DATA (no email is ever transmitted), so setting this to a domain you own is safe for that domain's sending reputation - only the probing IP accumulates any reputation signal.",
+  "helo_hostname": null,
+
+  "mail_from_user": "verify",
+
+  "max_workers": 15,
+  "per_domain_max_concurrent": 2,
+  "per_domain_delay_s": 1.0,
+  "connect_timeout": 8,
+
+  "catchall_probe_count": 2,
+
+  "enable_second_pass": true,
+  "greylist_retry_delay_s": 90,
+
+  "enable_gravatar": true,
+  "gravatar_timeout_s": 3
+}
