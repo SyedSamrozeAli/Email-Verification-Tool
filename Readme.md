@@ -1,4 +1,4 @@
-# Galadon Email Verifier
+# Email Verifier
 
 This is a local cold email verification tool. Drag in a CSV and it will:
 - Validate each email live (MX, SMTP, syntax)
@@ -6,6 +6,13 @@ This is a local cold email verification tool. Drag in a CSV and it will:
 - Let you cancel jobs mid-run
 - Persist your results even after refresh
 - Let you download the verified leads when ready
+
+<img width="869" height="420" alt="image" src="https://github.com/user-attachments/assets/a0e8dd2a-3461-4930-9b6d-b3da451f658d" />
+
+<img width="928" height="638" alt="image" src="https://github.com/user-attachments/assets/ab17849e-53b5-493c-9d4d-d3e5eb2b26cf" />
+
+<img width="840" height="838" alt="image" src="https://github.com/user-attachments/assets/b404305c-588e-45dc-acb1-f897d6c04207" />
+
 
 ---
 
