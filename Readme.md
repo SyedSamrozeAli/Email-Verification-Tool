@@ -11,15 +11,12 @@ This is a local cold email verification tool. Drag in a CSV and it will:
 
 ## 🧱 Setup
 
-1. Create a folder called:
+1. Clone the repo:
 ```
-Neverbounce Clone
+git clone [repo-link]
 ```
 
-2. Drag in these files:
-- `verify-app.py`
-- `index.html`
-- Your test CSV (e.g. `Testleads.csv`)
+2. Open the Folder
 
 ---
 
