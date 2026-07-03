@@ -388,9 +388,7 @@
       return html;
     }
 
-    function createJobBlock(job_id, fileName) {
-      const block = document.createElement('div');
-      block.className = 'job-block';
+    function mountRunningJob(block, job_id, fileName) {
       block.innerHTML = `
         <div class="job-head">
           <div class="job-line"><span class="prefix">$</span> verify <span class="job-filename"></span></div>
@@ -406,7 +404,6 @@
         <div class="actions-row"><div class="btn-row"><button class="btn cancel-btn" type="button">[ cancel ]</button></div></div>
       `;
       block.querySelector('.job-filename').textContent = fileName;
-      jobsContainer.prepend(block);
 
       const meterEl = block.querySelector('.meter-bar');
       const pctEl = block.querySelector('.progress-pct');
